@@ -7,6 +7,36 @@ class Base(DeclarativeBase):
     pass
 
 
+class Ingredient(Base):
+    __tablename__ = "ingredients"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    category = Column(String(50), nullable=False)
+    quantity_in_stock = Column(Float, default=0.0)
+    unit = Column(String(20), nullable=False)
+    low_stock_threshold = Column(Float, default=0.0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    menu_links = relationship("MenuItemIngredient", back_populates="ingredient", cascade="all, delete-orphan")
+    purchases = relationship("Purchase", back_populates="ingredient")
+
+    @property
+    def is_low(self):
+        return self.low_stock_threshold > 0 and self.quantity_in_stock <= self.low_stock_threshold
+
+
+class MenuItemIngredient(Base):
+    """How much of an ingredient is consumed per serving of a dish."""
+    __tablename__ = "menu_item_ingredients"
+    id = Column(Integer, primary_key=True)
+    menu_item_id = Column(Integer, ForeignKey("menu_items.id"), nullable=False)
+    ingredient_id = Column(Integer, ForeignKey("ingredients.id"), nullable=False)
+    quantity_per_serving = Column(Float, nullable=False)
+
+    menu_item = relationship("MenuItem", back_populates="ingredients")
+    ingredient = relationship("Ingredient", back_populates="menu_links")
+
+
 class MenuItem(Base):
     __tablename__ = "menu_items"
     id = Column(Integer, primary_key=True)
@@ -18,6 +48,7 @@ class MenuItem(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     order_items = relationship("OrderItem", back_populates="menu_item")
+    ingredients = relationship("MenuItemIngredient", back_populates="menu_item", cascade="all, delete-orphan")
 
 
 class Order(Base):
@@ -48,7 +79,7 @@ class OrderItem(Base):
 
 
 class Purchase(Base):
-    """Market purchase / ingredient restocking record."""
+    """Market purchase — optionally linked to an ingredient to restock it."""
     __tablename__ = "purchases"
     id = Column(Integer, primary_key=True)
     item_name = Column(String(100), nullable=False)
@@ -59,4 +90,7 @@ class Purchase(Base):
     total_cost = Column(Float, nullable=False)
     supplier = Column(String(100), default="")
     notes = Column(String(300), default="")
+    ingredient_id = Column(Integer, ForeignKey("ingredients.id"), nullable=True)
     purchased_at = Column(DateTime, default=datetime.utcnow)
+
+    ingredient = relationship("Ingredient", back_populates="purchases")
